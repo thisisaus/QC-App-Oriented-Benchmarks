@@ -20,13 +20,14 @@
    "source": [
     "min_qubits=2\n",
     "max_qubits=8\n",
+    "skip_qubits=1\n",
     "max_circuits=3\n",
     "num_shots=1000\n",
     "\n",
     "backend_id=\"qasm_simulator\"\n",
     "hub=\"ibm-q\"; group=\"open\"; project=\"main\"\n",
     "provider_backend = None\n",
-    "exec_options = None\n",
+    "exec_options = {}\n",
     "\n",
     "# # *** If using IBMQ hardware, run this once to authenticate\n",
     "# from qiskit import IBMQ\n",
@@ -56,11 +57,11 @@
     "# provider_backend = provider.get_backend(\"ionq_qpu\")\n",
     "# backend_id=\"ionq_qpu\"\n",
     "\n",
-    "# # *** Use these lines when running on hardware backend, to limit use of resources\n",
-    "# min_qubits=2\n",
-    "# max_qubits=5\n",
-    "# max_circuits=1\n",
-    "# num_shots=100"
+    "# # An example using BlueQubit provider\n",
+    "# import os, bluequbit, _common.executors.bluequbit_executor as bluequbit_executor\n",
+    "# provider_backend = bluequbit.init()\n",
+    "# backend_id=\"BlueQubit-CPU\"\n",
+    "# exec_options = { \"executor\": bluequbit_executor.run, \"device\":'cpu' }\n"
    ]
   },
   {
@@ -73,20 +74,15 @@
     "\n",
     "# # Example of pytket Transformer\n",
     "# import _common.transformers.tket_optimiser as tket_optimiser\n",
-    "# exec_options = { \"optimization_level\": 3, \"layout_method\":'sabre', \"routing_method\":'sabre', \"transformer\": tket_optimiser.high_optimisation }\n",
+    "# exec_options.update({ \"optimization_level\": 0, \"layout_method\":'sabre', \"routing_method\":'sabre', \"transformer\": tket_optimiser.high_optimisation })\n",
     "\n",
     "# # Define a custom noise model to be used during execution\n",
     "# import _common.custom.custom_qiskit_noise_model as custom_qiskit_noise_model\n",
-    "# exec_options = { \"noise_model\": custom_qiskit_noise_model.my_noise_model() }\n",
+    "# exec_options.update({ \"noise_model\": custom_qiskit_noise_model.my_noise_model() })\n",
     "\n",
     "# # Example of mthree error mitigation\n",
     "# import _common.postprocessors.mthree.mthree_em as mthree_em\n",
-    "# exec_options = { \"optimization_level\": 3, \"layout_method\":'sabre', \"routing_method\":'sabre',\n",
-    "#                         \"postprocessor\": mthree_em.get_mthree_handlers(backend_id, provider_backend) }\n",
-    "\n",
-    "# # Example of a custom Executor (BlueQubit)\n",
-    "# import _common.executors.bluequbit_executor as bluequbit_executor\n",
-    "# exec_options = { \"executor\": bluequbit_executor.run }\n"
+    "# exec_options.update({ \"postprocessor\": mthree_em.get_mthree_handlers(backend_id, provider_backend) })\n"
    ]
   },
   {
@@ -100,6 +96,7 @@
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
+    "scrolled": false,
     "tags": []
    },
    "outputs": [],
@@ -107,7 +104,8 @@
     "import sys\n",
     "sys.path.insert(1, \"deutsch-jozsa/qiskit\")\n",
     "import dj_benchmark\n",
-    "dj_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "dj_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
@@ -122,13 +120,16 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
     "sys.path.insert(1, \"bernstein-vazirani/qiskit\")\n",
     "import bv_benchmark\n",
-    "bv_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "bv_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                method=1,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
@@ -145,6 +146,7 @@
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
+    "scrolled": false,
     "tags": []
    },
    "outputs": [],
@@ -152,7 +154,8 @@
     "import sys\n",
     "sys.path.insert(1, \"bernstein-vazirani/qiskit\")\n",
     "import bv_benchmark\n",
-    "bv_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "bv_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                method=2,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
@@ -168,13 +171,16 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
     "sys.path.insert(1, \"hidden-shift/qiskit\")\n",
     "import hs_benchmark\n",
-    "hs_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "hs_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
@@ -189,13 +195,16 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
     "sys.path.insert(1, \"quantum-fourier-transform/qiskit\")\n",
     "import qft_benchmark\n",
-    "qft_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "qft_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                method=1,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
@@ -211,13 +220,16 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
     "sys.path.insert(1, \"quantum-fourier-transform/qiskit\")\n",
     "import qft_benchmark\n",
-    "qft_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "qft_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                method=2,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
@@ -233,13 +245,16 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
     "sys.path.insert(1, \"grovers/qiskit\")\n",
     "import grovers_benchmark\n",
-    "grovers_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "grovers_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
@@ -254,13 +269,16 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
     "sys.path.insert(1, \"phase-estimation/qiskit\")\n",
     "import pe_benchmark\n",
-    "pe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "pe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
@@ -286,7 +304,8 @@
     "\n",
     "hhl_benchmark.verbose=False\n",
     "\n",
-    "hhl_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "hhl_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                method=1, use_best_widths=True,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
@@ -302,13 +321,16 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
     "sys.path.insert(1, \"amplitude-estimation/qiskit\")\n",
     "import ae_benchmark\n",
-    "ae_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "ae_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
@@ -323,13 +345,16 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
     "sys.path.insert(1, \"monte-carlo/qiskit\")\n",
     "import mc_benchmark\n",
-    "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
@@ -344,13 +369,15 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
     "sys.path.insert(1, \"hamiltonian-simulation/qiskit\")\n",
     "import hamiltonian_simulation_benchmark\n",
-    "hamiltonian_simulation_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits,\n",
+    "hamiltonian_simulation_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,\n",
     "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
@@ -366,14 +393,17 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
     "sys.path.insert(1, \"vqe/qiskit\")\n",
     "import vqe_benchmark\n",
     "vqe_num_shots=4098\n",
-    "vqe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=vqe_num_shots,\n",
+    "vqe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=vqe_num_shots,\n",
     "                method=1,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
@@ -389,7 +419,9 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
@@ -411,7 +443,9 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "scrolled": false
+   },
    "outputs": [],
    "source": [
     "import sys\n",
@@ -441,7 +475,7 @@
     "import metrics\n",
     "\n",
     "# metrics.depth_base = 2\n",
-    "# metrics.QV = 64\n",
+    "# metrics.QV = 0\n",
     "# apps = [ \"Hidden Shift\", \"Grover's Search\", \"Quantum Fourier Transform (1)\", \"Hamiltonian Simulation\" ]\n",
     "# backend_id='qasm_simulator'\n",
     "\n",
