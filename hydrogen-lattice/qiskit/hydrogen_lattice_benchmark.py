@@ -15,17 +15,17 @@ from typing import Optional
 import numpy as np
 from scipy.optimize import minimize
 
-from qiskit import Aer, QuantumCircuit, execute
+from qiskit import QuantumCircuit
+from qiskit_aer import Aer
+
 from qiskit.circuit import ParameterVector
-from qiskit.exceptions import QiskitError
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
 
-
+# QED-C benchmark-specific imports
 sys.path[1:1] = ["_common", "_common/qiskit", "hydrogen-lattice/_common"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/"]
 
-# benchmark-specific imports
 import common
 import execute as ex
 import metrics as metrics
@@ -537,11 +537,11 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id="statevector_simu
     qc = qc.remove_final_measurements(inplace=False)
 
     if params is not None:
-        qc = qc.bind_parameters(params)
+        qc = qc.assign_parameters(params)
 
     # execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
-    sv_result = execute(qc, sv_backend, params=params).result()
+    sv_result = sv_backend.run(qc, params=params).result()
 
     # get the probability distribution
     counts = sv_result.get_counts()
@@ -1319,7 +1319,7 @@ def run(
             # if the problem is not pre-defined, we are done with this number of qubits
             operator = get_operator_for_problem(instance_filepath)
             if operator is None:
-                print(f"  ... problem not found.")
+                print("  ... problem not found.")
                 break
 
             # get a list of the classical solutions for this problem
@@ -1370,7 +1370,7 @@ def run(
                 # for testing and debugging ...
                 #if using parameter objects, bind before printing
                 if verbose:
-                    print(qc.bind_parameters(params) if parameterized else qc)
+                    print(qc.assign_parameters(params) if parameterized else qc)
                 """
                 # store the creation time for these circuits
                 metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)
@@ -1390,7 +1390,7 @@ def run(
 
             ###############
             if method == 2:
-                logger.info(f"===============  Begin method 2 loop, enabling transpile")
+                logger.info("===============  Begin method 2 loop, enabling transpile")
 
                 # a unique circuit index used inside the inner minimizer loop as identifier
                 # Value of 0 corresponds to the 0th iteration of the minimizer
@@ -1478,7 +1478,7 @@ def run(
                             cached_circuits = False
                             if cached_circuits:
                                 ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                                logger.info(f"**** First execution complete, disabling transpile")
+                                logger.info("**** First execution complete, disabling transpile")
 
                         # result array stores the multiple results we measure along different Pauli basis.
                         #global saved_result
@@ -1500,7 +1500,7 @@ def run(
                         for qc in qc_array:
                             # bind parameters to circuit before execution
                             if parameterized:
-                                qc.bind_parameters(params)
+                                qc.assign_parameters(params)
                                 
                             # submit circuit for execution on target with the current parameters
                             ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
@@ -1516,7 +1516,7 @@ def run(
                                 cached_circuits = False
                                 if cached_circuits:
                                     ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                                    logger.info(f"**** First execution complete, disabling transpile")
+                                    logger.info("**** First execution complete, disabling transpile")
      
                             # result array stores the multiple results we measure along different Pauli basis.
                             global saved_result

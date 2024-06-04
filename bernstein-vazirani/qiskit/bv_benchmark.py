@@ -32,7 +32,7 @@ Uf_ = None
 def create_oracle(num_qubits, input_size, secret_int):
     # Initialize first n qubits and single ancilla qubit
     qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name=f"Uf")
+    qc = QuantumCircuit(qr, name="Uf")
 
     # perform CX for each qubit that matches a bit in secret string
     s = ('{0:0' + str(input_size) + 'b}').format(secret_int)
@@ -48,7 +48,7 @@ def BersteinVazirani (num_qubits, secret_int, method = 1):
 
     if method == 1:
         # allocate qubits
-        qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size);
+        qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size)
         qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-{secret_int}")
 
         # put ancilla in |1> state
@@ -124,10 +124,11 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     # obtain counts from the result object
     counts = result.get_counts(qc)
-    if verbose: print(f"For secret int {secret_int} measured: {counts}")
+    if verbose: print(f"For secret int {secret_int} measured: {counts}")   
     
     # create the key that is expected to have all the measurements (for this circuit)
     key = format(secret_int, f"0{input_size}b")
+    if verbose: print(f"... key = {key}")
     
     # correct distribution is measuring the key 100% of the time
     correct_dist = {key: 1.0}
@@ -141,7 +142,8 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
-        backend_id='qasm_simulator', method = 1, provider_backend=None,
+        backend_id='qasm_simulator', method=1, input_value=None,
+        provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
 
@@ -201,10 +203,18 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
         if 2**(input_size) <= max_circuits:
             s_range = list(range(num_circuits))
         else:
-            s_range = np.random.choice(2**(input_size), num_circuits, False)
-
+            # create selection larger than needed and remove duplicates (faster than random.choice())
+            s_range = np.random.randint(1, 2**(input_size), num_circuits + 10)
+            s_range = list(set(s_range))[0:max_circuits]
+            
         # loop over limited # of secret strings for this
         for s_int in s_range:
+        
+            # if user specifies input_value, use it instead
+            # DEVNOTE: if max_circuits used, this will generate multiple bars per width
+            if input_value is not None:
+                s_int = input_value
+                
             # If mid circuit, then add 2 to new qubit group since the circuit only uses 2 qubits
             if method == 2:
                 mid_circuit_qubit_group.append(2)

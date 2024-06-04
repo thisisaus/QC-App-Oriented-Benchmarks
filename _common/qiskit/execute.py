@@ -23,7 +23,6 @@
 # execution, so they can be aggregated and presented to the user.
 #
 
-import sys
 import os
 import time
 import copy
@@ -34,16 +33,16 @@ import logging
 import numpy as np
 
 from datetime import datetime, timedelta
-from qiskit import execute, Aer, transpile
+from qiskit import transpile
+from qiskit_aer import Aer
 from qiskit.providers.jobstatus import JobStatus
+
+# Noise Model imports
+from qiskit_aer.noise import NoiseModel, ReadoutError
+from qiskit_aer.noise import depolarizing_error, reset_error
 
 # QED-C modules
 import metrics
-
-# Noise
-from qiskit.providers.aer.noise import NoiseModel, ReadoutError
-from qiskit.providers.aer.noise import depolarizing_error, reset_error
-
 
 ##########################
 # JOB MANAGEMENT VARIABLES 
@@ -76,7 +75,10 @@ session_count = 0
 session = None
 sampler = None
 
-# IBM-Q Service save here if created
+# Use the IBM Quantum Platform system; default is to use the IBM Cloud
+use_ibm_quantum_platform = False
+
+# IBM Quantum Service save here if created
 service = None
 
 # Azure Quantum Provider saved here if created
@@ -232,7 +234,7 @@ def set_execution_target(backend_id='qasm_simulator',
                 hub=None, group=None, project=None, exec_options=None,
                 context=None):
     """
-    Used to run jobs on a real hardware
+    Set the backend execution target.
     :param backend_id:  device name. List of available devices depends on the provider
     :param hub: hub identifier, currently "ibm-q" for IBM Quantum, "azure-quantum" for Azure Quantum 
     :param group: group identifier, used with IBM-Q accounts.
@@ -253,6 +255,10 @@ def set_execution_target(backend_id='qasm_simulator',
     global session_count
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
 
+    # default to qasm_simulator if None passed in
+    if backend_id == None:
+        backend_id="qasm_simulator"
+        
     # if a custom provider backend is given, use it ...
     # Note: in this case, the backend_id is an identifier that shows up in plots
     if provider_backend != None:
@@ -299,6 +305,8 @@ def set_execution_target(backend_id='qasm_simulator',
 
     # otherwise use the given providername or backend_id to find the backend
     else:
+        global service
+        global sampler
     
         # if provider_module name and provider_name are provided, obtain a custom provider
         if provider_module_name and provider_name:  
@@ -350,8 +358,10 @@ def set_execution_target(backend_id='qasm_simulator',
                     
             backend.latest_session = session
             
-        # otherwise, assume the backend_id is given only and assume it is IBMQ device
-        else:
+        ###############################
+        # if using IBM Quantum Platform, assume the backend_id is given only
+        elif use_ibm_quantum_platform: 
+        
             from qiskit import IBMQ
             if IBMQ.stored_account():
             
@@ -366,8 +376,6 @@ def set_execution_target(backend_id='qasm_simulator',
                 # if use sessions, setup runtime service, Session, and Sampler
                 if use_sessions:
                     from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session, Options
-                    global service
-                    global sampler
                     
                     service = QiskitRuntimeService()
                     session_count += 1
@@ -411,6 +419,68 @@ def set_execution_target(backend_id='qasm_simulator',
                     backend = provider.get_backend(backend_id)
             else:
                 print(authentication_error_msg.format("IBMQ"))
+
+        ###############################
+        # otherwise, assume the backend_id is given only and assume it is IBM Cloud device
+        else:
+            from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session, Options
+            
+            # create the Runtime Service object
+            service = QiskitRuntimeService()
+            
+            # obtain a backend from the service
+            backend = service.backend(backend_id)
+               
+            # DEVNOTE: here we assume if the sessions flag is set, we use Sampler
+            # however, we may want to add a use_sampler option so that we can separate these
+            
+            # set use_sessions if provided by user - NOTE: this will modify the global setting
+            this_use_sessions = exec_options.get("use_sessions", None)
+            if this_use_sessions != None:
+                use_sessions = this_use_sessions
+
+            # if use sessions, setup runtime service, Session, and Sampler
+            if use_sessions:
+            
+                if verbose:
+                    print("... using sessions")
+                
+                session = Session(service=service, backend=backend_id)
+                
+                # get Sampler resilience level and transpiler optimization level from exec_options
+                options = Options()
+                options.resilience_level = exec_options.get("resilience_level", 1)
+                options.optimization_level = exec_options.get("optimization_level", 3)
+                
+                # special handling for ibmq_qasm_simulator to set noise model
+                if backend_id == "ibmq_qasm_simulator":
+                    this_noise = noise
+                    
+                    # get noise model from options; used only in simulators for now
+                    if "noise_model" in exec_options:
+                        this_noise = exec_options.get("noise_model", None)
+                        if verbose:
+                            print(f"... using custom noise model: {this_noise}")
+                            
+                    # attach to backend if not None
+                    if this_noise != None:
+                        options.simulator = {"noise_model": this_noise}
+                        metrics.QV = this_noise.QV
+                        if verbose:
+                            print(f"... setting noise model, QV={this_noise.QV} on {backend_id}")
+                    
+                if verbose:
+                    print(f"... execute using Sampler on backend_id {backend_id} with options = {options}")
+                
+                # create the Qiskit Sampler with these options
+                sampler = Sampler(session=session, options=options)
+                
+            # otherwise, use the circuit runner in the submit_circuit method, without sessions
+            else: 
+                if verbose:
+                    print("... not using sessions")
+                    print(f"... execute using Circuit Runner on backend_id {backend_id}")
+
 
     # create an informative device name for plots
     device_name = backend_id
@@ -524,7 +594,7 @@ def execute_circuit(circuit):
     qc_tr_depth = qc_depth
     qc_tr_size = qc_size
     qc_tr_count_ops = qc_count_ops
-    qc_tr_xi = qc_xi; 
+    qc_tr_xi = qc_xi 
     qc_tr_n2q = qc_n2q
     #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
     
@@ -619,7 +689,7 @@ def execute_circuit(circuit):
                 dummy = backend_exec_options_copy.pop("noise_model", None)
                         
                 # transpile and bind circuit with parameters; use cache if flagged   
-                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend)
+                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend, basis_gates=this_noise.basis_gates)
                 simulation_circuits = trans_qc
                         
                 # apply transformer pass if provided
@@ -632,17 +702,12 @@ def execute_circuit(circuit):
                 if width_processor:
                     width_processor(qc)
                 
-                # for noisy simulator, use execute() which works; 
+                # for noisy simulator, use backend.run() which can take noise model; 
                 # no need for transpile above unless there are options like transformer
                 logger.info(f'Running circuit on noisy simulator, shots={shots}')
                 st = time.time()
                 
-                ''' some circuits, like Grover's behave incorrectly if we use run()
                 job = backend.run(simulation_circuits, shots=shots,
-                    noise_model=this_noise, basis_gates=this_noise.basis_gates,
-                    **backend_exec_options_copy)
-                '''   
-                job = execute(simulation_circuits, backend, shots=shots,
                     noise_model=this_noise, basis_gates=this_noise.basis_gates,
                     **backend_exec_options_copy)
                     
@@ -749,7 +814,7 @@ def wait_on_job_result(job, active_circuit):
             result = job.result()
             break
                          
-        except Exception as e:
+        except Exception:
             print(f'... error occurred during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
             if verbose: print(traceback.format_exc())
             time.sleep(15)
@@ -774,7 +839,7 @@ def get_job_status(job, active_circuit):
             status = job.status()
             break
                          
-        except Exception as e:
+        except Exception:
             print(f'... error occurred during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
             if verbose: print(traceback.format_exc())
             time.sleep(15)
@@ -832,9 +897,9 @@ def transpile_for_metrics(qc):
         logger.info(f"End transpile with {basis_selector = }")
     else:
         basis_gates = basis_gates_array[basis_selector]
-        logger.info(f"Start transpile with basis_selector != 0")
+        logger.info("Start transpile with basis_selector != 0")
         qc = transpile(qc, basis_gates=basis_gates, seed_transpiler=0)
-        logger.info(f"End transpile with basis_selector != 0")
+        logger.info("End transpile with basis_selector != 0")
     
     #print(qc)
         
@@ -865,15 +930,15 @@ def transpile_for_metrics(qc):
 # Cache the transpiled circuit, and use it if do_transpile_for_execute not set
 # DEVNOTE: this approach does not permit passing of untranspiled circuit through
 # DEVNOTE: currently this only caches a single circuit
-def transpile_and_bind_circuit(circuit, params, backend,
+def transpile_and_bind_circuit(circuit, params, backend, basis_gates=None,
                 optimization_level=None, layout_method=None, routing_method=None):
                 
-    logger.info(f'transpile_and_bind_circuit()')
+    logger.info('transpile_and_bind_circuit()')
     st = time.time()
         
     if do_transpile_for_execute:
         logger.info('transpiling for execute')
-        trans_qc = transpile(circuit, backend, 
+        trans_qc = transpile(circuit, backend, basis_gates=basis_gates,
                 optimization_level=optimization_level, layout_method=layout_method, routing_method=routing_method) 
         
         # cache this transpiled circuit
@@ -881,7 +946,7 @@ def transpile_and_bind_circuit(circuit, params, backend,
     
     else:
         logger.info('use cached transpiled circuit for execute')
-        if verbose_time: print(f"  ... using cached circuit, no transpile")
+        if verbose_time: print("  ... using cached circuit, no transpile")
 
         ##trans_qc = circuit["qc"]
         
@@ -899,9 +964,9 @@ def transpile_and_bind_circuit(circuit, params, backend,
         # Note: some loggers cannot handle unicode in param names, so only show the values
         #logger.info(f"Binding parameters to circuit: {str(params)}")
         logger.info(f"Binding parameters to circuit: {[param[1] for param in params.items()]}")
-        if verbose_time: print(f"  ... binding parameters")
+        if verbose_time: print("  ... binding parameters")
         
-        trans_qc = trans_qc.bind_parameters(params)
+        trans_qc = trans_qc.assign_parameters(params)
         #print(trans_qc)
         
         # store original name in parameterized circuit, so it can be found with get_result()
@@ -1118,7 +1183,7 @@ def job_complete(job):
     
         # invoke a result processor if specified in exec_options
         if result_processor:
-            logger.info(f'result_processor(...)')
+            logger.info('result_processor(...)')
             result = result_processor(result)
     
         # The following computes the counts by summing them up, allowing for the case where
@@ -1422,10 +1487,10 @@ def check_jobs(completion_handler=None):
 
         # when complete, canceled, or failed, process the job
         if status == JobStatus.CANCELLED:
-            print(f"... circuit execution cancelled.")
+            print("... circuit execution cancelled.")
 
         if status == JobStatus.ERROR:
-            print(f"... circuit execution failed.")
+            print("... circuit execution failed.")
             if hasattr(job, "error_message"):
                 print(f"    job = {job.job_id()}  {job.error_message()}")
 
@@ -1564,10 +1629,10 @@ def job_wait_for_completion(job):
     #if verbose: print("Job status is ", job.status() )
     
     if job.status() == JobStatus.CANCELLED:
-        print(f"\n... circuit execution cancelled.")
+        print("\n... circuit execution cancelled.")
             
     if job.status() == JobStatus.ERROR:
-        print(f"\n... circuit execution failed.")
+        print("\n... circuit execution failed.")
 
 
 
