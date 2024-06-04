@@ -180,7 +180,11 @@ def execute_circuit(circuit):
         # load the file
         H = qc.H
         print("Uploading file shape", H.shape)
-        file_response = backend.upload_file(H, file_type="hamiltonian")
+        hamiltonian_file = {"file_config": {"hamiltonian": {
+            "data": H,
+            "num_variables": H.shape[0]
+        }}}
+        file_response = backend.upload_file(file=hamiltonian_file)
         file_id = file_response["file_id"]
         print("Got file_id", file_id)
         opt_exec_time = time.time() - ts
@@ -189,29 +193,30 @@ def execute_circuit(circuit):
         ts = time.time() 
         print("Building job request", device_name, n_samples)
         job_body = backend.build_job_body(hamiltonian_file_id=file_id,
-                                            job_type="sample-hamiltonian",
-                                            job_params={"sampler_type": device_name, 
-                                                        "n_samples": n_samples})
-        job_response = backend.process_job(job_body=job_body, job_type="sample-hamiltonian")
-        job_metrics = job_response["job_info"]["metrics"]
-        qatalyst_total_job_time_ns = job_metrics['time_ns']['wall']['total']
+                                            job_type="sample-hamiltonian-ising",
+                                            job_params={"device_type": device_name, 
+                                                        "num_samples": n_samples})
+        job_response = backend.process_job(job_body=job_body, wait=True)
+        job_id = job_response["job_info"]["job_id"]
+        job_metrics = backend.get_job_metrics(job_id=job_id)["job_metrics"]
+        qatalyst_total_job_time_ns = job_metrics['time_ns']['wall']['end'] - \
+            job_metrics['time_ns']['wall']['start']
 
         # the total amount of time that the job spent in queue waiting to run
-        qatalyst_total_queue_time_ns = job_metrics['time_ns']['wall']['queue']['total']
+        qatalyst_total_queue_time_ns = job_metrics['time_ns']['wall']['queue']['end'] - \
+            job_metrics['time_ns']['wall']['queue']['start']
 
-        device = device_name.replace("-", "_")
-        device = device.replace("eqc", "dirac_")
-        provider_name = "qphoton"
         # device_reference = f"{device}_device"
         # controller_name = f"{device}_controller"
         # Total time for the job inside the QPU subsystem
-        qpu_total_time_ns = job_metrics['provider'][provider_name]['time_ns']['wall']['total']
+        qpu_total_time_ns = job_metrics['time_ns']['device'][device_name]['samples']['end'][0] - \
+            job_metrics['time_ns']['device'][device_name]['samples']['start'][0]
         
         # Processing time for the job inside the QPU subsystem
-        qpu_processing_time_ns = job_metrics['provider'][provider_name]['time_ns']['wall']['processing']['total']
+        qpu_processing_time_ns = job_metrics['time_ns']['device'][device_name]['samples']['runtime'][0]
         
         # Total queue time within the QPU subsystem
-        qpu_queue_time_ns = job_metrics['provider'][provider_name]['time_ns']['wall']['queue']['total']
+        # qpu_queue_time_ns = job_metrics['time_ns']['device']...
         
         elapsed_time = time.time() - ts
         # exec_time = (sampleset.info["timing"]["qpu_access_time"] / 1000000)
@@ -249,7 +254,7 @@ def execute_circuit(circuit):
         #     return "".join(cut_list)
         
         # for Neal simulator (mimicker), compute counts from each record returned, one per shot
-        samples = results["samples"]
+        samples = results["solutions"]
         # rewrite Ising Hamiltonian as bits
         for i in range(len(samples)):
             for j in range(len(samples[i])):

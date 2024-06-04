@@ -620,6 +620,7 @@ def load_from_width_restart_file(folder, fileName):
         of inputs that were used in maxcut_benchmark.run method
     """
     
+    _instances = None
     # Extract num_qubits and s from file name
     num_qubits, restart_ind = get_width_restart_tuple_from_filename(fileName)
     print(f"Loading from {fileName}, corresponding to {num_qubits} qubits and restart index {restart_ind}")
@@ -636,13 +637,31 @@ def load_from_width_restart_file(folder, fileName):
         
         backend_id = gen_prop.get('backend_id')
         metrics.set_plot_subtitle(f"Device = {backend_id}")
+        degree = gen_prop["degree"]
+        instance_filename = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "_common",
+            common.INSTANCE_DIR,
+            f"mc_{num_qubits:03d}_{degree:03d}_000.txt",
+        )
+        nodes, edges = common.read_maxcut_instance(instance_filename, _instances)
+        opt, _ = common.read_maxcut_solution(
+            instance_filename[:-4] + ".sol", _instances
+        )
         
         # Update circuit metrics
         for circuit_id in data['iterations']:
             # circuit_id = restart_ind * 1000 + minimizer_loop_ind
             for metric, value in data['iterations'][circuit_id].items():
                 metrics.store_metric(num_qubits, circuit_id, metric, value)
-                
+        cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
+        
+        # Also compute and store the weights of cuts at three quantile values
+        quantile_sizes = compute_quartiles(counts, sizes)
+        # Store quantile_optgaps as a list (allows storing in json files)
+        metrics.store_metric(num_qubits, restart_ind, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) 
+            
         # method = gen_prop['method']
         # if method == 2:
         metrics.store_props_final_iter(num_qubits, restart_ind, 'optimal_value', opt)
@@ -1066,7 +1085,10 @@ def plot_results_from_data(num_shots=100, degree=3, max_iter=30, max_circuits = 
     #             offset_flag=offset_flag,
     #             options=options, suffix=suffix)
     
-    metrics.plot_metrics_optgaps(suptitle, options=options, suffix=suffix, objective_func_type = objective_func_type)
+    metrics.plot_metrics_optgaps(suptitle, options=options, suffix=suffix, objective_func_type = objective_func_type,
+                                 which_metrics_to_plot="all")
+    metrics.plot_metrics(f"Benchmark Results - MaxCut - Qatalyst",
+            options=dict(shots=num_shots))
     
     # this plot is deemed less useful
     #metrics.plot_ECDF(suptitle=suptitle, options=options, suffix=suffix)
@@ -1074,10 +1096,10 @@ def plot_results_from_data(num_shots=100, degree=3, max_iter=30, max_circuits = 
     all_widths = list(metrics.circuit_metrics_final_iter.keys())
     all_widths = [int(ii) for ii in all_widths]
     list_of_widths = [all_widths[-1]]
-    # metrics.plot_cutsize_distribution(suptitle=suptitle,options=options, suffix=suffix, list_of_widths = list_of_widths)
+    metrics.plot_cutsize_distribution(suptitle=suptitle,options=options, suffix=suffix, list_of_widths = list_of_widths)
     
     # not needed for Qatalyst version
-    metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
+    # metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
 
 # if main, execute method
 if __name__ == '__main__': 
