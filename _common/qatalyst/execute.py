@@ -58,8 +58,6 @@ cached_circuits = {}
 embedding_flag = True
 embedding = None
 
-# n_samples defaults to 1 for EQC, has no effect on CSample
-n_samples = 1
 # number of decimal places for time values (seconds)
 time_precision = 5
 # number of nanoseconds per second
@@ -191,11 +189,11 @@ def execute_circuit(circuit):
         
         # perform the annealing operation
         ts = time.time() 
-        print("Building job request", device_name, n_samples)
+        print("Building job request", device_name, shots)
         job_body = backend.build_job_body(hamiltonian_file_id=file_id,
                                             job_type="sample-hamiltonian-ising",
                                             job_params={"device_type": device_name, 
-                                                        "num_samples": n_samples})
+                                                        "num_samples": shots})
         job_response = backend.process_job(job_body=job_body, wait=True)
         job_id = job_response["job_info"]["job_id"]
         job_metrics = backend.get_job_metrics(job_id=job_id)["job_metrics"]

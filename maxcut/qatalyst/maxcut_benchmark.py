@@ -849,7 +849,7 @@ def run (min_qubits=3, max_qubits=MAX_QUBITS, max_circuits=1, num_shots=1,
     metrics.init_metrics()
     
     # Define custom result handler
-    def execution_handler (qc, result, num_qubits, s_int, num_shots):  
+    def execution_handler (qc, result, num_qubits, s_int, num_):  
      
         # determine fidelity of result set
         num_qubits = int(num_qubits)
@@ -918,7 +918,7 @@ def run (min_qubits=3, max_qubits=MAX_QUBITS, max_circuits=1, num_shots=1,
             metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
 
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc, num_qubits, restart_ind, params=params)                
+            ex.submit_circuit(qc, num_qubits, restart_ind, shots=num_shots, params=params)                
                     
             # also store the 'degree' for each execution
             metrics.store_metric(num_qubits, restart_ind, 'degree', degree)
